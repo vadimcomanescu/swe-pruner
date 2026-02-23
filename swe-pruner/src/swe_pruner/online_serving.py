@@ -1,4 +1,6 @@
+import asyncio
 import os
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Optional
 from fastapi import FastAPI, HTTPException
@@ -14,6 +16,7 @@ app = FastAPI(title="Code Pruning Service")
 
 # Global model and tokenizer
 model: Optional[SwePrunerForCodePruning] = None
+_inference_executor = ThreadPoolExecutor(max_workers=1)
 
 # Create Typer app
 cli = typer.Typer(help="SwePruner code pruning service")
@@ -68,7 +71,8 @@ async def health_check():
 async def prune_code(request: PruneRequest) -> PruneResponse | None:
     if model is None:
         raise HTTPException(status_code=500, detail="Model not loaded")
-    response = model.prune(request)
+    loop = asyncio.get_event_loop()
+    response = await loop.run_in_executor(_inference_executor, model.prune, request)
     return response
 
 
