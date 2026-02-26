@@ -156,6 +156,11 @@ def serve():
         t0 = time.monotonic()
         response = await loop.run_in_executor(executor, model.prune, request)
         latency_ms = int((time.monotonic() - t0) * 1000)
+
+        agent = request.client_info.agent if request.client_info else "unknown"
+        model_id = request.client_info.model if request.client_info else ""
+        print(f"prune | agent={agent} model={model_id} latency={latency_ms}ms")
+
         response_dict = (
             response.model_dump()
             if hasattr(response, "model_dump")

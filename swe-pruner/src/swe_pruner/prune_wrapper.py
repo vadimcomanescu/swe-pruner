@@ -7,12 +7,19 @@ from .swepruner import SwePrunerForCodeCompression, SwePrunerOutput
 from pydantic import BaseModel
 
 
+class ClientInfo(BaseModel):
+    agent: str = "unknown"
+    model: str = ""
+    mcp_server_version: str = ""
+
+
 class PruneRequest(BaseModel):
     query: str
     code: str
     threshold: float = 0.5
     always_keep_first_frags: bool = False
     chunk_overlap_tokens: int = 50
+    client_info: ClientInfo = ClientInfo()
 
 
 class PruneResponse(BaseModel):
