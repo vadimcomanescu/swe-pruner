@@ -201,6 +201,95 @@ def build_input_for_llm(
     }
 
 
+def build_input_for_llm_unpadded(
+    query: str,
+    code: str,
+    tokenizer: AutoTokenizer,
+    max_length: int = 8192,
+    instruction: Optional[str] = None,
+) -> dict:
+    """Same as build_input_for_llm but returns raw lists instead of padded tensors.
+
+    Used by batch_inputs() to pad to longest-in-batch rather than global max_length.
+    """
+    formatted_query = format_instruction(instruction, query)
+
+    query_enc = tokenizer(
+        formatted_query,
+        add_special_tokens=False,
+        truncation=False,
+        return_attention_mask=False,
+    )
+    code_enc = tokenizer(
+        code,
+        add_special_tokens=False,
+        truncation=False,
+        return_attention_mask=False,
+        return_offsets_mapping=True,
+    )
+
+    query_ids = query_enc["input_ids"]
+    code_ids = code_enc["input_ids"]
+
+    prefix = '<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be "yes" or "no".<|im_end|>\n<|im_start|>user\n'
+    suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+    prefix_tokens = tokenizer.encode(prefix, add_special_tokens=False)
+    suffix_tokens = tokenizer.encode(suffix, add_special_tokens=False)
+
+    available_length = max_length - len(prefix_tokens) - len(suffix_tokens)
+    query_len = len(query_ids)
+    code_len = len(code_ids)
+
+    if query_len + code_len > available_length:
+        truncate_to = available_length - query_len
+        code_ids = code_ids[:truncate_to]
+        code_offsets = code_enc["offset_mapping"][:truncate_to]
+        code_len = len(code_ids)
+    else:
+        code_offsets = code_enc["offset_mapping"]
+
+    input_ids = prefix_tokens + query_ids + code_ids + suffix_tokens
+    doc_start = len(prefix_tokens) + query_len
+    doc_end = doc_start + code_len
+
+    return {
+        "input_ids": input_ids,
+        "seq_len": len(input_ids),
+        "doc_start": doc_start,
+        "doc_end": doc_end,
+        "code_offsets": code_offsets,
+        "code_len": code_len,
+    }
+
+
+def batch_inputs(
+    unpadded_inputs: List[dict],
+    pad_token_id: int,
+) -> Tuple[torch.Tensor, torch.Tensor, List[dict]]:
+    """Pad unpadded inputs to longest-in-batch and stack into tensors.
+
+    Returns (input_ids [B, L], attention_mask [B, L], metadata list).
+    Pads to max sequence length in the batch, not global max_length,
+    so a batch of 8 requests averaging 2K tokens uses [8, ~2K] not [8, 8192].
+    """
+    max_len = max(inp["seq_len"] for inp in unpadded_inputs)
+
+    batch_input_ids = []
+    batch_attention_mask = []
+
+    for inp in unpadded_inputs:
+        ids = inp["input_ids"]
+        pad_len = max_len - len(ids)
+        batch_input_ids.append(ids + [pad_token_id] * pad_len)
+        batch_attention_mask.append([1] * len(ids) + [0] * pad_len)
+
+    return (
+        torch.tensor(batch_input_ids, dtype=torch.long),
+        torch.tensor(batch_attention_mask, dtype=torch.long),
+        unpadded_inputs,
+    )
+
+
 def aggregate_token_scores_to_lines(
     code: str,
     token_scores: List[Tuple[str, float]],
@@ -532,6 +621,67 @@ class SwePrunerForCodePruning(SwePrunerForCodeCompression):
 
         return chunk_score, code_token_scores, code_offsets
 
+    def _process_chunk_batch(
+        self,
+        queries: List[str],
+        code_chunks: List[str],
+        max_length: int = 8192,
+    ) -> List[Tuple[float, List[Tuple[str, float]], List[Tuple[int, int]]]]:
+        """Process multiple code chunks in a single batched forward pass."""
+        self._ensure_device()
+
+        unpadded = [
+            build_input_for_llm_unpadded(
+                q, c, self.tokenizer, max_length, self.instruction
+            )
+            for q, c in zip(queries, code_chunks)
+        ]
+
+        input_ids, attention_mask, metadata = batch_inputs(
+            unpadded, self.tokenizer.pad_token_id
+        )
+        input_ids = input_ids.to(self._device)
+        attention_mask = attention_mask.to(self._device)
+
+        with torch.no_grad():
+            with torch.amp.autocast(
+                device_type="cuda" if torch.cuda.is_available() else "cpu",
+                dtype=torch.float16,
+            ):
+                outputs: SwePrunerOutput = self(
+                    input_ids=input_ids, attention_mask=attention_mask
+                )
+
+            token_logits = outputs.token_logits.float()  # [B, L]
+            score_logits = outputs.score_logits.float()  # [B]
+
+        results = []
+        for i, meta in enumerate(metadata):
+            doc_start = meta["doc_start"]
+            doc_end = meta["doc_end"]
+            code_offsets = meta["code_offsets"]
+
+            score_prob = score_logits[i].cpu()
+            if self.model.is_llm:
+                chunk_score = float(torch.exp(score_prob).item())
+            else:
+                chunk_score = float(torch.sigmoid(score_prob).item())
+
+            token_logits_seq = token_logits[i].cpu()
+            probs = torch.sigmoid(token_logits_seq)
+
+            code_token_ids = input_ids[i][doc_start:doc_end].cpu().tolist()
+            code_token_scores = []
+            for idx, pos in enumerate(range(doc_start, doc_end)):
+                token_id = code_token_ids[idx]
+                token_str = self.tokenizer.convert_ids_to_tokens([token_id])[0]
+                score = float(probs[pos].item())
+                code_token_scores.append((token_str, score))
+
+            results.append((chunk_score, code_token_scores, code_offsets))
+
+        return results
+
     def prune(self, request: PruneRequest, max_length: int = 8192) -> PruneResponse:
         max_length = 8192
         # Check if we need to split into chunks
@@ -647,3 +797,77 @@ class SwePrunerForCodePruning(SwePrunerForCodeCompression):
             + len(prefix_tokens)
             + len(suffix_tokens),
         )
+
+    def prune_batch(
+        self, requests: List[PruneRequest], max_length: int = 8192,
+    ) -> List[PruneResponse]:
+        """Batch-prune multiple requests in a single forward pass.
+
+        Single-chunk requests are batched together for one GPU forward pass.
+        Multi-chunk and too-long-query requests fall back to sequential self.prune().
+        """
+        max_length = 8192
+
+        prefix = '<|im_start|>system\nJudge whether the Document meets the requirements based on the Query and the Instruct provided. Note that the answer can only be "yes" or "no".<|im_end|>\n<|im_start|>user\n'
+        suffix = "<|im_end|>\n<|im_start|>assistant\n<think>\n\n</think>\n\n"
+        prefix_tokens = self.tokenizer.encode(prefix, add_special_tokens=False)
+        suffix_tokens = self.tokenizer.encode(suffix, add_special_tokens=False)
+        overhead = len(prefix_tokens) + len(suffix_tokens)
+
+        MIN_CODE_TOKENS = 100
+
+        single_indices = []
+        fallback_indices = []
+
+        for i, req in enumerate(requests):
+            formatted_query = format_instruction(None, req.query)
+            query_tokens = estimate_token_count(formatted_query, self.tokenizer)
+            code_tokens = estimate_token_count(req.code, self.tokenizer)
+            code_max = max_length - overhead - query_tokens
+
+            if code_max < MIN_CODE_TOKENS or code_tokens > code_max:
+                fallback_indices.append(i)
+            else:
+                single_indices.append(i)
+
+        responses: List[Optional[PruneResponse]] = [None] * len(requests)
+
+        # Batch all single-chunk requests in one forward pass
+        if single_indices:
+            queries = [requests[i].query for i in single_indices]
+            codes = [requests[i].code for i in single_indices]
+
+            batch_results = self._process_chunk_batch(queries, codes, max_length)
+
+            for idx, i in enumerate(single_indices):
+                req = requests[i]
+                predicted_score, code_token_scores, code_token_offsets = (
+                    batch_results[idx]
+                )
+
+                line_scores = aggregate_token_scores_to_lines(
+                    req.code, code_token_scores, code_token_offsets
+                )
+                pruned_code, kept_frags = prune_code_lines(
+                    req.code, line_scores, req.threshold, req.always_keep_first_frags
+                )
+
+                code_tokens = estimate_token_count(req.code, self.tokenizer)
+                formatted_query = format_instruction(None, req.query)
+                query_tokens = estimate_token_count(formatted_query, self.tokenizer)
+
+                responses[i] = PruneResponse(
+                    score=predicted_score,
+                    pruned_code=pruned_code,
+                    token_scores=[[t, s] for t, s in code_token_scores],
+                    kept_frags=kept_frags,
+                    origin_token_cnt=code_tokens,
+                    left_token_cnt=estimate_token_count(pruned_code, self.tokenizer),
+                    model_input_token_cnt=query_tokens + code_tokens + overhead,
+                )
+
+        # Multi-chunk / too-long-query: sequential fallback (rare, already saturates GPU)
+        for i in fallback_indices:
+            responses[i] = self.prune(requests[i])
+
+        return responses
