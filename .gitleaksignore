@@ -1,0 +1,16 @@
+# False positives in own commits: curl examples in plan files (no actual auth header).
+2acd3970647da2645ce4cad84578cef30cac8f7a:plans/mellow-orbiting-lake.md:curl-auth-header:203
+2acd3970647da2645ce4cad84578cef30cac8f7a:plans/mellow-orbiting-lake.md:curl-auth-header:209
+2acd3970647da2645ce4cad84578cef30cac8f7a:plans/scalable-twirling-dusk.md:curl-auth-header:105
+2acd3970647da2645ce4cad84578cef30cac8f7a:plans/scalable-twirling-dusk.md:curl-auth-header:113
+
+# False positives in upstream code: TransformerEmbedderAdapter(embed_model, embed_tokenizer, max_length=512) misread as a key.
+f2a11947bb261efc5cfa95e5cb271aeb16da260c:downstream_eval/single_turn/longcodeqa/eval.py:generic-api-key:965
+332a5976521f6ccacbe043cc1092ec5a1ca6741f:downstream_eval/single_turn/longcodeqa/eval.py:generic-api-key:965
+
+# Real Moonshot API keys committed in upstream history (commit d9dbfa1, "feat: added downstream tasks codes and scripts").
+# Already publicly visible at github.com/Ayanami1314/swe-pruner; upstream removed them in afd42ed ("chore: remove unused key").
+# Mirroring the existing public history of the upstream fork; no new exposure introduced.
+d9dbfa13d54f6fc4b126682b656d84e5b4cff3bb:downstream_eval/multi_turn/swebench/mini-swe-agent--with-pruning/src/minisweagent/config/extra/swebench_base.yaml:generic-api-key:233
+d9dbfa13d54f6fc4b126682b656d84e5b4cff3bb:downstream_eval/multi_turn/swebench/mini-swe-agent--with-pruning/src/minisweagent/config/extra/swebench.yaml:generic-api-key:280
+d9dbfa13d54f6fc4b126682b656d84e5b4cff3bb:downstream_eval/multi_turn/swebench/mini-swe-agent--with-pruning/src/minisweagent/config/extra/swebench.yaml:generic-api-key:281
