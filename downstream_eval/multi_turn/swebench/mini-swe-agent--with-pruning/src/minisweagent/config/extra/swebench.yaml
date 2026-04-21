@@ -271,17 +271,10 @@ environment:
   environment_class: docker
 
 model:
-  model_name: Claude 4.5 Sonnet
-  litellm_model_registry: "/data/harry/SWE-Agent-C/mini-swe-agent--with-pruning/src/minisweagent/model_registry.json"
+  model_name: <you model>
   model_kwargs:
-    # custom_llm_provider: "openai"
-    # api_base: http://publicshare.a.pinggy.link/v1
-    api_base: http://claude0openai.a.pinggy.link/v1
-    api_key: msk-00e323944a4933264c7aa966872ae50a0e11298410dbbc4d4b0bd0b1e897ed84 # mine
-    # api_key: msk-67260fae97f724abc513186a3ba35d6e5b61c5bfe262b58e9928c0d69aeb3ccf # coworker's
-    # timeout: 180
+    api_base: <...>
+    api_key: <...>
+    timeout: 180
     drop_params: true
     temperature: 0.0
-  set_cache_control: default_end
-  # litellm_model_name_override: "claude-sonnet-4-20250514"
-  litellm_model_name_override: claude-sonnet-4-20250514

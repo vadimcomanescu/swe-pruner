@@ -20,11 +20,15 @@
 <summary><h2>📢 Latest Updates</h2></summary>
 
 **🔥 Releases:**
-- 1/28/2025: We release some scripts for optimize and visualize the result! see `./utils`
-- 1/27/2025: We published our tech blogs: `Towards Real-World Software Agents: How we push Semantic Highlight feature to Agentic Coding?`
+- 4/6/2026: SWE-Pruner has been accepted to **ACL 2026 Main Conference**!
+- 4/6/2026: Training code and reproduction guide now available! See [Training Guide](./train/README.md).
+- 3/8/2026: Our 61k training dataset(for python) now available in [google drive](https://drive.google.com/file/d/18g_kWeyvd8EICEDZcKylEEf8mnOFhwdi)!
+- 3/8/2026: We update our evaluation pipeline for SWE-QA benchmark! see `downstream_eval/multi_turn/sweqa`
+- 1/28/2026: We release some scripts for optimize and visualize the result! see `./utils`
+- 1/27/2026: We published our tech blogs: `Towards Real-World Software Agents: How we push Semantic Highlight feature to Agentic Coding?`
   - 📄 [Towards Real-World Software Agents: How we push Semantic Highlight feature to Agentic Coding? ](https://www.notion.so/Towards-Real-World-Software-Agents-How-we-push-Semantic-Highlight-feature-to-Agentic-Coding-2f5b099561948096b911c9e1043b8e11)
   - 📄 [迈向真实世界的软件智能体：如何将语义高亮功能融入智能体编程？](https://www.notion.so/2f5b0995619480ff8bc5edce30de6b92)
-- 1/26/2025: Introduce **SWE-Pruner**
+- 1/26/2026: Introduce **SWE-Pruner**
   - 📖 paper: https://arxiv.org/abs/2601.16746
   - ⚙️ code: https://github.com/Ayanami1314/swe-pruner
   - 🐍 pip: https://pypi.org/project/swe-pruner/
@@ -89,7 +93,7 @@ Since different modules have different dependencies, please refer to the specifi
 - For Users, look [Inference Tutorial](./swe-pruner/README.md) to start a swe-pruner locally and then reading [real world examples](examples/README.md) for agents integration.
   - We now support [OpenHands](https://github.com/OpenHands/OpenHands) and [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-python)!
 
-- For Developers, look `./train`(coming soon) for training a pruner by yourself!
+- For Developers, look [Training Guide](./train/README.md) to reproduce our training or build your own pruner from scratch.
 
 - For Researchers, `./downstream_eval` has some scripts for reproducing our results. We recommend to use [slurm](https://github.com/SchedMD/slurm) with at least 4 GPU to reuse our scripts.
 
@@ -97,10 +101,10 @@ Since different modules have different dependencies, please refer to the specifi
 We provide some utils scripts for continue improving the swe-pruner in `./utils`, just look `utils/README.md`!
 
 ## 🔮 Coming Soon
-- [ ] 💻 Update Training Code of SWE-Pruner
+- [x] 💻 Update Training Code of SWE-Pruner
 - [ ] 📁 Upload full parameters and trajectory files & logs
-- [ ] 📁 Upload Training Dataset of SWE-Pruner
-- [ ] 📁 Upload SWE-QA evaluation code
+- [x] 📁 Upload Training Dataset of SWE-Pruner
+- [x] 📁 Upload SWE-QA evaluation code
 - [x] 🤗 Update HuggingFace model card
 - [x] 🤗 Update HuggingFace blog to introducing our  technical approach in detail.
 - [x] 🎮 Update agents integrate demo
