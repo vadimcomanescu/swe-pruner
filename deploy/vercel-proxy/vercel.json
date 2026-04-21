@@ -1,5 +1,0 @@
-{
-  "rewrites": [
-    { "source": "/(.*)", "destination": "https://vadimcomanescu--winnow-serve.modal.run/$1" }
-  ]
-}

@@ -58,31 +58,10 @@ Inspired by how human programmers "selectively skim" source code, **SWE-Pruner**
 **🔧 Flexibly Use**
   Adaptable framework for various LLMs and scenarios, from debugging to feature development.
 
-## ☁️ Hosted API (Modal)
-
-A ready-to-use deployment runs on Modal (L4 GPU, scale-to-zero):
-
-```
-https://vadimcomanescu--swe-pruner-serve.modal.run
-```
-
-```bash
-# Health check
-curl https://vadimcomanescu--swe-pruner-serve.modal.run/health
-
-# Prune code
-curl -s -X POST https://vadimcomanescu--swe-pruner-serve.modal.run/prune \
-  -H "Content-Type: application/json" \
-  -d '{"query": "error handling", "code": "...", "threshold": 0.5}'
-```
-
-See [deploy/README.md](./deploy/README.md) for how to deploy your own instance.
-
 ## 🌲 Project Structure
 ```text
 .
 ├── data/                      # Experiment trace archives and hyperparameter configurations
-├── deploy/                    # Modal serverless deployment (modal_app.py + README)
 ├── downstream_eval/           # Downstream evaluation benchmarks
 │   ├── multi_turn/            # Includes: SWE-bench, SWEQA (coming soon)
 │   └── single_turn/           # Includes: LongCodeQA, LCC (LongCodeCompletion)
